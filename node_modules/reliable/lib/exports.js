@@ -1,0 +1,1 @@
+window.Reliable = require('./reliable');
