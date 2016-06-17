@@ -12,6 +12,14 @@ video {
   height: 360px;
   display: block;
 }
+
+canvas {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
   </style>
 </head>
 <body>
@@ -46,9 +54,12 @@ video {
   <video id="remote" autoplay></video>
 
   <!-- TODO(smus): annoying that THREE.js is not browserify friendly. -->
-  <script src="node_modules/three/three.js"></script>
+  <script src="node_modules/three/build/three.js"></script>
   <script src="node_modules/three/examples/js/effects/VREffect.js"></script>
   <script src="node_modules/three/examples/js/controls/VRControls.js"></script>
+  <script src="node_modules/three/examples/js/loaders/MTLLoader.js"></script>
+  <script src="node_modules/three/examples/js/loaders/OBJLoader.js"></script>
+
 
   <script src="build/all.js"></script>
 </body>

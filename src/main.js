@@ -1,5 +1,17 @@
+var AudioRenderer = require('./audio-renderer');
+var ChatRenderer = require('./chat-renderer');
 var FirebaseSignal = require('./firebase-signal');
 var PeerConnection = require('./peer-connection');
+var Pose = require('./pose');
+var Util = require('./util');
+
+// Globals.
+var audioRenderer;
+var chatRenderer;
+var fb;
+var lastSentPose;
+var pc;
+var rafID;
 
 function onLoad() {
   pc = new PeerConnection();
@@ -12,15 +24,33 @@ function onLoad() {
 
   pc.on('opened', function() {
     fb.connect();
+    chatRenderer = new ChatRenderer();
+    chatRenderer.on('scale', onScale);
+    render();
   });
   pc.on('disconnected', function() {
     fb.disconnect();
+    chatRenderer.destroy();
+    cancelAnimationFrame(rafID);
   });
 
-  // When a remote stream is available, show it.
+  pc.on('data', function(data) {
+    var jsonObject = JSON.parse(data);
+    if (jsonObject.type == 'pose') {
+      var pose = Pose.fromJsonObject(jsonObject.data);
+      chatRenderer.setPeerPose(pose);
+      if (audioRenderer) {
+        audioRenderer.setPeerPose(pose);
+      }
+    }
+  });
+
+  // When a remote stream is available, render it via Web Audio.
   pc.on('remoteStream', function(stream) {
     var video = document.querySelector('video#remote');
+    video.muted = true;
     video.src = URL.createObjectURL(stream);
+    audioRenderer = new AudioRenderer(stream);
   });
 
   callButton = document.querySelector('button#call');
@@ -44,6 +74,10 @@ function onUsersChanged(users) {
   }
 }
 
+function onScale(newScale, oldScale) {
+  // Playback a sound effect.
+}
+
 function createUser(user) {
   var li = document.createElement('li');
   li.classList.add('mdl-list__item');
@@ -62,6 +96,28 @@ function createUser(user) {
 
 function onCallUser() {
   pc.connect(selectedUser.peerId);
+}
+
+function render() {
+  chatRenderer.render();
+
+  // Get the current pose, and send it to the peer, but only if it's changed.
+  var pose = chatRenderer.getPose();
+  if (!pose.equals(lastSentPose)) {
+    var message = {
+      type: 'pose',
+      data: pose.toJsonObject()
+    };
+    pc.send(JSON.stringify(message));
+    lastSentPose = pose;
+    console.log('Sent pose', pose);
+  }
+
+  if (audioRenderer) {
+    audioRenderer.setPose(pose);
+  }
+
+  rafID = requestAnimationFrame(render);
 }
 
 window.addEventListener('load', onLoad);

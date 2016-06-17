@@ -1,6 +1,10 @@
 var EventEmitter = require('eventemitter3');
 var Peer = require('peerjs');
 
+var PEER_HOST = 'copresence-vr.herokuapp.com';
+var PEER_PORT = 443;
+var API_KEY = 'hhs0czskhjda38fr';
+
 /**
  * Wraps around peer.js to provide Audio and Data channels.
  *
@@ -19,7 +23,7 @@ var Peer = require('peerjs');
 function PeerConnection() {
   var self = this;
   this.getWebRTCConfig_().then(function(config) {
-    peer = new Peer({key: 'hhs0czskhjda38fr', config: config}); 
+    peer = new Peer({config: config, host: PEER_HOST, port: PEER_PORT, secure: true}); 
     peer.on('call', self.onIncomingCall_.bind(self));
     peer.on('error', self.onPeerError_.bind(self));
     peer.on('connection', self.onOpenConnection_.bind(self));
