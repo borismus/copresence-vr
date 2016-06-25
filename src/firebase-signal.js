@@ -38,8 +38,8 @@ FirebaseSignal.prototype = new EventEmitter();
 FirebaseSignal.prototype.watchUsers_ = function() {
   var self = this;
   this.onlineRef.on('value', function(snapshot) {
-    console.log('watchUsers_: usersChanged');
-    self.emit('usersChanged', snapshot.val());
+    console.log('watchUsers_: usersChange');
+    self.emit('usersChange', snapshot.val());
   });
 };
 
@@ -52,6 +52,10 @@ FirebaseSignal.prototype.connect = function() {
 
 FirebaseSignal.prototype.disconnect = function() {
   this.userRef.update({isAvailable: true});
+};
+
+FirebaseSignal.prototype.setUsername = function(name) {
+  this.userRef.update({username: name});
 };
 
 FirebaseSignal.prototype.registerSelf_ = function(peerId) {

@@ -17,8 +17,8 @@ var API_KEY = 'hhs0czskhjda38fr';
  * Events:
  *   remoteStream: a remote stream is available.
  *   data: some data was received.
- *   opened: this connection was opened.
- *   disconnected: this connection was closed.
+ *   open: this connection was opened.
+ *   disconnect: this connection was closed.
  */
 function PeerConnection() {
   var self = this;
@@ -63,7 +63,7 @@ PeerConnection.prototype.connect = function(remotePeerId) {
 };
 
 PeerConnection.prototype.getPeerId = function() {
-  return this.peer.id;
+  return this.peer ? this.peer.id : null;
 };
 
 /**
@@ -122,13 +122,14 @@ PeerConnection.prototype.onReceiveConnection_ = function(conn) {
 
 PeerConnection.prototype.onOpenConnection_ = function(conn) {
   this.connection = conn;
-  this.emit('opened');
+  this.emit('open');
 
   conn.on('data', this.onData_.bind(this));
 
   var self = this;
   conn.on('close', function() {
-    self.emit('disconnected');
+    self.emit('disconnect');
+    self.peer = null;
   });
 };
 

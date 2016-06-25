@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "browserify src/main.js | derequire > build/all.js",
-    "watch": "watchify src/main.js -v -d -o 'derequire > build/all.js'"
+    "watch": "watchify src/main.js -v -d -o 'derequire > build/all.js'",
+    "watch-test": "watchify src/main-test.js -v -d -o 'derequire > build/all.js'"
   },
   "author": "Boris Smus <boris@smus.com>",
   "license": "Apache-2.0",
@@ -16,6 +17,7 @@
     "peerjs": "^0.3.14",
     "soundbank-pitch-shift": "^1.0.3",
     "three": "^0.77.1",
+    "tween.js": "^16.3.4",
     "webvr-boilerplate": "^0.4.3"
   }
 }

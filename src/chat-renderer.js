@@ -5,7 +5,8 @@ var EventEmitter = require('eventemitter3');
 var Pose = require('./pose');
 require('webvr-polyfill');
 var Util = require('./util');
-var WebVRManager = require('webvr-boilerplate');
+// TODO(smus): Make this more require-y.
+require('webvr-boilerplate');
 
 /**
  * Renders the chat world, which includes the person you are chatting with, and
@@ -14,12 +15,10 @@ var WebVRManager = require('webvr-boilerplate');
  * Functionality
  *   Look around the world.
  *   Move around the world by looking on the ground and clicking.
- *   Render the other peer in 6DOF.
- *   TODO(smus): Smoothly transition the other peer as they move around the world.
  *   TODO(smus): Shrink/grow yourself, and the other peer.
  */
 function ChatRenderer() {
-  this.scale = 1.5;
+  this.scale = 0.5;
 
   this.init_();
 }
@@ -54,17 +53,13 @@ ChatRenderer.prototype.init_ = function() {
   effect = new THREE.VREffect(renderer);
   effect.setSize(window.innerWidth, window.innerHeight);
 
+  // WebVR Boilerplate.
+  this.manager = new WebVRManager(renderer, effect);
+
   // Add lighting.
   var light = new THREE.DirectionalLight(0xefefff, 1.5);
   light.position.set(1, 1, 1).normalize();
   scene.add(light);
-
-  // Add the peer.
-  Util.loadObj('models/tree_pine_1').then(function(mesh) {
-    var peer = mesh.children[0];
-    peer.name = 'peer';
-    scene.add(peer);
-  });
   
   var raycaster = new THREE.Raycaster();
   var mouse = new THREE.Vector2();
@@ -128,31 +123,32 @@ ChatRenderer.prototype.destroy = function() {
   window.removeEventListener('touchend', this.boundTouchEnd, false);
 };
 
-ChatRenderer.prototype.render = function() {
+ChatRenderer.prototype.render = function(ts) {
   this.controls.update();
-  this.effect.render(this.scene, this.camera);
+
+  this.manager.render(this.scene, this.camera, ts);
+  //this.effect.render(this.scene, this.camera);
 
   this.raycast_();
+};
+
+ChatRenderer.prototype.onResize = function() {
+  this.effect.setSize(window.innerWidth, window.innerHeight);
+  this.camera.aspect = window.innerWidth / window.innerHeight;
+  this.camera.updateProjectionMatrix();
 };
 
 /**
  * Returns the 6DOF pose as an object: {
  *   quaternion: Quaternion(x, y, z, w),
- *   position: Vector3(x, y, z)
+ *   position: Vector3(x, y, z),
+ *   scale: Number
  * }
  */
 ChatRenderer.prototype.getPose = function() {
   var position = this.dolly.position.clone();
   position.y = 0;
   return new Pose(this.camera.quaternion, position, this.scale);
-};
-
-ChatRenderer.prototype.setPeerPose = function(peerPose) {
-  var peer = this.scene.getObjectByName('peer');
-  peer.position.copy(peerPose.position);
-  peer.quaternion.copy(peerPose.quaternion);
-  var s = peerPose.scale;
-  peer.scale.set(s, s, s);
 };
 
 ChatRenderer.prototype.onMouseMove_ = function(e) {

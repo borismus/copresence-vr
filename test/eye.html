@@ -1,0 +1,25 @@
+<style>
+body {
+  background: gray;
+}
+</style>
+<canvas width=800 height=600></canvas>
+
+<script src="../build/eye-renderer-test.js"></script>
+<script src="../node_modules/three/build/three.js"></script>
+<script>
+var r = new EyeRenderer();
+
+requestAnimationFrame(render);
+
+function render() {
+  TWEEN.update();
+
+  var eyeCanvas = r.getTexture();
+  var canvas = document.querySelector('canvas');
+  var ctx = canvas.getContext('2d');
+  ctx.drawImage(eyeCanvas, 0, 0);
+
+  requestAnimationFrame(render);
+}
+</script>

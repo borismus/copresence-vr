@@ -70,4 +70,8 @@ Util.serializePose = function(pose) {
   return JSON.stringify(pose);
 };
 
+Util.randInt = function(min, max) {
+  return parseInt(min + Math.random() * (max - min));
+};
+
 module.exports = Util;

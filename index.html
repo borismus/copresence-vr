@@ -7,10 +7,12 @@
   <link rel="stylesheet" href="https://code.getmdl.io/1.1.3/material.indigo-pink.min.css">
   <script defer src="https://code.getmdl.io/1.1.3/material.min.js"></script>
   <style>
-video {
-  width: 640px;
-  height: 360px;
-  display: block;
+body {
+  overflow: hidden;
+}
+
+#name-form {
+  margin: 1em;
 }
 
 canvas {
@@ -24,34 +26,27 @@ canvas {
 </head>
 <body>
 
+  <!-- Simple Textfield -->
+  <form id="name-form" action="#">
+    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+      <input class="mdl-textfield__input" type="text" id="name">
+      <label class="mdl-textfield__label" for="name">Your name</label>
+    </div>
+  </form>
+
+
   <ul id="user-list" class="demo-list-icon mdl-list">
     <li class="mdl-list__item">
       <span class="mdl-list__item-primary-content">
-        <i class="material-icons mdl-list__item-icon">person</i>
-        Bryan Cranston
-      </span>
-    </li>
-    <li class="mdl-list__item">
-      <span class="mdl-list__item-primary-content">
-        <i class="material-icons mdl-list__item-icon">person</i>
-        Aaron Paul
-      </span>
-    </li>
-    <li class="mdl-list__item">
-      <span class="mdl-list__item-primary-content">
-        <i class="material-icons mdl-list__item-icon">person</i>
-        Bob Odenkirk
+        No users yet.
       </span>
     </li>
   </ul>
-  
+
   <!-- Accent-colored raised button with ripple -->
   <button id="call" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent">
     Call
   </button>
-
-
-  <video id="remote" autoplay></video>
 
   <!-- TODO(smus): annoying that THREE.js is not browserify friendly. -->
   <script src="node_modules/three/build/three.js"></script>
