@@ -8,17 +8,41 @@ var TWEEN = require('tween.js');
 var Util = require('./util');
 
 // Globals.
-var audioRenderer;
+var audioRenderer = new AudioRenderer();
 var chatRenderer;
 // For now, just one peer renderer, but ultimately we will have one per peer.
 var peerRenderer;
 var fb;
 var lastSentPose;
-var pc;
+var lastSentTime = performance.now();
+//var pc;
 var rafID;
+var remoteStream;
+
+var POSE_UPDATE_MS = 50;
 
 function onLoad() {
+  // Establish a new peer connection.
+  startPeerConnection();
+
+  callButton = document.querySelector('button#call');
+  callButton.disabled = true;
+
+  // Hook up the call button.
+  callButton.addEventListener('click', onCallUser);
+
+  // Hook up the name change thing.
+  var nameInput = document.querySelector('input#name');
+  if (localStorage.username) {
+    nameInput.value = localStorage.username;
+  }
+  nameInput.addEventListener('keyup', onUsernameChange);
+  nameInput.addEventListener('blur', onUsernameChange);
+}
+
+function startPeerConnection() {
   pc = new PeerConnection();
+
   pc.on('ready', function(peerId) {
     fb = new FirebaseSignal(peerId);
     if (localStorage.username) {
@@ -40,13 +64,19 @@ function onLoad() {
     peerRenderer.enter();
     render();
   });
-  pc.on('disconnect', function() {
+  pc.on('close', function() {
+    console.log('close');
     // Render the peer leaving.
     peerRenderer.leave();
 
+    // Notify the signalling server.
     fb.disconnect();
     chatRenderer.destroy();
     cancelAnimationFrame(rafID);
+
+    // Kill the remote stream.
+    var track = remoteStream.getTracks()[0];
+    track.stop();
   });
 
   pc.on('data', function(data) {
@@ -65,23 +95,9 @@ function onLoad() {
     var audio = new Audio();
     audio.muted = true;
     audio.src = URL.createObjectURL(stream);
-    audioRenderer = new AudioRenderer();
     audioRenderer.setRemoteStream(stream);
+    remoteStream = stream;
   });
-
-  callButton = document.querySelector('button#call');
-  callButton.disabled = true;
-
-  // Hook up the call button.
-  callButton.addEventListener('click', onCallUser);
-
-  // Hook up the name change thing.
-  var nameInput = document.querySelector('input#name');
-  if (localStorage.username) {
-    nameInput.value = localStorage.username;
-  }
-  nameInput.addEventListener('keyup', onUsernameChange);
-  nameInput.addEventListener('blur', onUsernameChange);
 }
 
 function onResize() {
@@ -141,19 +157,23 @@ function render() {
   chatRenderer.render();
 
   // Get the current pose, and send it to the peer, but only if it's changed.
+  var now = performance.now();
+  var lastMessageDelta = now - lastSentTime;
   var pose = chatRenderer.getPose();
-  if (!pose.equals(lastSentPose)) {
+  if (!pose.equals(lastSentPose) && lastMessageDelta > POSE_UPDATE_MS) {
     var message = {
       type: 'pose',
       data: pose.toJsonObject()
     };
     pc.send(JSON.stringify(message));
     lastSentPose = pose;
+    lastSentTime = now;
     console.log('Sent pose', pose);
   }
 
   if (audioRenderer) {
     audioRenderer.setPose(pose);
+    peerRenderer.setPeerAudioLevel(audioRenderer.getLevel());
   }
 
   TWEEN.update();

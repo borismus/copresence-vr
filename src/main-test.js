@@ -5,22 +5,34 @@ var Pose = require('./pose');
 var TWEEN = require('tween.js');
 
 function onLoad() {
-  audioRenderer = new AudioRenderer(null);
+  audioRenderer = new AudioRenderer();
   chatRenderer = new ChatRenderer();
   peerRenderer = new PeerRenderer(chatRenderer.scene);
 
+  // Stay at a distance, rotate toward me.
   peerRenderer.peer.position.set(0, 0, -5);
+  peerRenderer.peer.rotation.y = Math.PI;
+
+  // Get access to microphone and connect it up to the graph.
+  navigator.webkitGetUserMedia({video: false, audio: true}, function(stream) {
+    audioRenderer.setRemoteStream(stream);
+  }, function(error) {
+    console.log('GetUserMedia error', error);
+  });
 
   requestAnimationFrame(render);
 }
 
 function render() {
   chatRenderer.render();
+
   TWEEN.update();
 
   if (audioRenderer) {
     var pose = chatRenderer.getPose();
     audioRenderer.setPose(pose);
+
+    peerRenderer.setPeerAudioLevel(audioRenderer.getLevel());
   }
 
   requestAnimationFrame(render);
@@ -52,11 +64,11 @@ function onKeyUp(e) {
       break;
     case 82: // R: rotate.
       var quat = peerRenderer.peer.quaternion;
-      quat.setFromEuler(new THREE.Euler(0.0, 0.0, 0.5));
+      quat.setFromEuler(new THREE.Euler(0.1, Math.PI, 0));
       peerRenderer.setPeerPose(new Pose(quat, peer.position));
       break;
     case 80: // P: play.
-      audioRenderer.playRemoteSound('grow');
+      audioRenderer.playRemoteSound_('grow');
       break;
   }
 }
