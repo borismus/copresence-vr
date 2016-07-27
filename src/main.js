@@ -22,6 +22,10 @@ var remoteStream;
 var POSE_UPDATE_MS = 50;
 
 function onLoad() {
+  // Ensure that we are either in a localhost or secure environment.
+  if (window.location.hostname !== 'localhost' && window.location.protocol !== 'https:') {
+    window.location.protocol = 'https';
+  }
   // Establish a new peer connection.
   startPeerConnection();
 
