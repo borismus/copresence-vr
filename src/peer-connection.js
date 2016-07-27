@@ -4,6 +4,7 @@ var Peer = require('peerjs');
 var PEER_HOST = 'copresence-vr.herokuapp.com';
 var PEER_PORT = 443;
 var API_KEY = 'hhs0czskhjda38fr';
+var GUM_CONSTRAINTS = {video: false, audio: true};
 
 /**
  * Wraps around peer.js to provide Audio and Data channels.
@@ -18,7 +19,7 @@ var API_KEY = 'hhs0czskhjda38fr';
  *   remoteStream: a remote stream is available.
  *   data: some data was received.
  *   open: this connection was opened.
- *   disconnect: this connection was closed.
+ *   close: this connection was closed.
  */
 function PeerConnection() {
   var self = this;
@@ -47,7 +48,7 @@ PeerConnection.prototype.connect = function(remotePeerId) {
   var self = this;
 
   // Make the audio call happen.
-  navigator.webkitGetUserMedia({video: false, audio: true}, function(stream) {
+  navigator.webkitGetUserMedia(GUM_CONSTRAINTS, function(stream) {
     var call = self.peer.call(remotePeerId, stream);
     call.on('stream', function(remoteStream) {
       // Show stream in some video/canvas element.
@@ -100,7 +101,7 @@ PeerConnection.prototype.getWebRTCConfig_ = function() {
 
 PeerConnection.prototype.onIncomingCall_ = function(call) {
   var self = this;
-  navigator.webkitGetUserMedia({video: true, audio: true}, function(stream) {
+  navigator.webkitGetUserMedia(GUM_CONSTRAINTS, function(stream) {
     call.answer(stream); // Answer the call with an A/V stream.
     call.on('stream', function(remoteStream) {
       // Show stream in some video/canvas element.
@@ -128,8 +129,7 @@ PeerConnection.prototype.onOpenConnection_ = function(conn) {
 
   var self = this;
   conn.on('close', function() {
-    self.emit('disconnect');
-    self.peer = null;
+    self.emit('close');
   });
 };
 
