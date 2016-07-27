@@ -1,13 +1,17 @@
 var TWEEN = require('tween.js');
 var Util = require('./util');
 
+var HEAD_Y = 0.5;
 var BREATHING_RATE = 3000;
 var EYE_RADIUS = 0.075;
 var EYE_SEPARATION = 0.3;
-var HEAD_HEIGHT = 1;
+var HEAD_HEIGHT = 0.75;
+var HEAD_WIDTH = 1;
+var JAW_HEIGHT = 0.25;
 var LEG_SEPARATION = 0.5;
 var LEG_RADIUS = 0.1;
-var LEG_HEIGHT = 0.3;
+var LEG_HEIGHT = 0.6;
+var MOUTH_HEIGHT = 0.01;
 var SCALE_DURATION = 1000;
 var WALK_DURATION = 1000;
 var WALK_ANGLE = Math.PI/6;
@@ -51,9 +55,18 @@ function PeerRenderer(scene) {
   peer.add(rightLeg);
 
   // Create the head.
-  var head = this.createHead_();
-  head.position.y = LEG_HEIGHT/2 + HEAD_HEIGHT/2;
+  var head = new THREE.Object3D();
+  head.position.y = HEAD_Y;
   peer.add(head);
+
+  // Create the lower jaw.
+  var lower = this.createJaw_();
+  lower.position.y = -JAW_HEIGHT/2;
+  head.add(lower);
+
+  var upper = this.createHead_();
+  upper.position.y = HEAD_HEIGHT/2 + MOUTH_HEIGHT;
+  head.add(upper);
 
   // Give the head some eyes.
   var eyeRoot = new THREE.Object3D();
@@ -63,10 +76,9 @@ function PeerRenderer(scene) {
   rightEye.position.x = -EYE_SEPARATION/2;
   eyeRoot.add(leftEye);
   eyeRoot.add(rightEye);
-  head.add(eyeRoot);
-  eyeRoot.position.z = -HEAD_HEIGHT/2;
-
-  // TODO(smus): Give the head a mouth.
+  upper.add(eyeRoot);
+  eyeRoot.position.z = -HEAD_WIDTH/2;
+  eyeRoot.position.y = -JAW_HEIGHT/2;
 
   // Add the torso to the scene.
   scene.add(peer);
@@ -75,6 +87,7 @@ function PeerRenderer(scene) {
   this.scene = scene;
   this.peer = peer;
   this.head = head;
+  this.upper = upper;
   this.eyeRoot = eyeRoot;
 
   this.leftLeg = leftLeg;
@@ -105,15 +118,16 @@ PeerRenderer.prototype.leave = function() {
 
 PeerRenderer.prototype.setPeerPose = function(peerPose) {
   var self = this;
-  // TODO(smus): Tween this throughout, play walking animations, etc.
 
-  if (!this.peer.position.equals(peerPose.position)) {
+  if (!this.peer.position.equals(peerPose.position) && !this.targetPosition) {
+    this.targetPosition = peerPose.position;
     // Tween the position of the peer.
     var move = new TWEEN.Tween(this.peer.position);
-    move.to(peerPose.position, WALK_DURATION);
+    move.to(this.targetPosition, WALK_DURATION);
     move.onComplete(function() {
       // When done, go into idle mode.
       self.stopWalking_();
+      self.targetPosition = null;
     });
     move.start();
     // When starting, go into walking mode.
@@ -121,30 +135,38 @@ PeerRenderer.prototype.setPeerPose = function(peerPose) {
   }
 
 
+  var euler = new THREE.Euler();
+  euler.setFromQuaternion(peerPose.quaternion);
+  euler.reorder('YXZ');
   // Apply the yaw to the whole body.
-  var yaw = peerPose.quaternion.clone();
-  yaw.x = 0;
-  yaw.z = 0;
-  yaw.normalize();
-  this.peer.quaternion.copy(yaw);
+  this.peer.rotation.y = euler.y;
 
   // Apply the pitch and roll to the head.
-  var pitchRoll = peerPose.quaternion.clone();
-  pitchRoll.y = 0;
-  pitchRoll.normalize();
+  this.head.rotation.x = euler.x;
+  this.head.rotation.z = euler.z;
 
-  // Tween the scale.
   var s = peerPose.scale;
   var targetScale = new THREE.Vector3(s, s, s);
-  var rescale = new TWEEN.Tween(this.peer.scale);
-  rescale.to(targetScale, SCALE_DURATION).easing(TWEEN.Easing.Back.InOut).start();
+  // Tween the scale, only if the target scale is different, and if we're not
+  // already scaling.
+  if (!targetScale.equals(this.peer.scale) && !this.targetScale) {
+    this.targetScale = targetScale;
+    var rescale = new TWEEN.Tween(this.peer.scale);
+    rescale.onComplete(function() {
+      self.targetScale = null;
+    });
+    rescale.to(targetScale, SCALE_DURATION).easing(TWEEN.Easing.Back.InOut).start();
+  }
 };
 
 /**
- * Animate the audio level for this peer. Maybe do it in a way that is stylized.
+ * Animate the audio level for this peer.
  * https://musiclab.chromeexperiments.com/Oscillators
  */
-PeerRenderer.prototype.setPeerAudioLevel = function() {
+PeerRenderer.prototype.setPeerAudioLevel = function(level) {
+  if (level !== null) {
+    this.speak_();
+  }
 };
 
 PeerRenderer.prototype.startIdleAnimation_ = function() {
@@ -233,6 +255,34 @@ PeerRenderer.prototype.walk_ = function() {
   rightBack.chain(rightForward).start();
 };
 
+PeerRenderer.prototype.speak_ = function() {
+  // Don't speak again if already speaking.
+  if (this.isSpeaking) {
+    return;
+  }
+
+  var self = this;
+
+  // Tween the upper part of the head, Southpark style.
+  var originalPosition = this.upper.position.clone();
+  var targetPosition = originalPosition.clone();
+  targetPosition.y += 0.1;
+
+  var up = new TWEEN.Tween(this.upper.position);
+  up.to(targetPosition, 100);
+
+  var down = new TWEEN.Tween(this.upper.position);
+  down.to(originalPosition, 100);
+
+  down.onComplete(function(e) {
+    self.isSpeaking = false;
+  });
+
+  up.chain(down);
+  up.start();
+  self.isSpeaking = true;
+};
+
 PeerRenderer.prototype.startWalking_ = function() {
   this.stopIdleAnimation_();
   this.lastWalkTime = performance.now() - WALKING_RATE;
@@ -258,16 +308,23 @@ PeerRenderer.prototype.createEye_ = function() {
 
 PeerRenderer.prototype.createLeg_ = function() {
   var geometry = new THREE.CylinderGeometry(LEG_RADIUS, LEG_RADIUS, LEG_HEIGHT)
-  var material = new THREE.MeshBasicMaterial({color: 0x000000});
+  var material = new THREE.MeshStandardMaterial({color: 0x000000});
   var leg = new THREE.Mesh(geometry, material);
   return leg;
 };
 
 PeerRenderer.prototype.createHead_ = function() {
-  var geometry = new THREE.BoxGeometry(HEAD_HEIGHT, HEAD_HEIGHT, HEAD_HEIGHT);
-  var material = new THREE.MeshBasicMaterial({color: 0xFF4181});
+  var geometry = new THREE.BoxGeometry(HEAD_WIDTH, HEAD_HEIGHT, HEAD_WIDTH);
+  var material = new THREE.MeshStandardMaterial({color: 0xFF4181});
   var head = new THREE.Mesh(geometry, material);
   return head;
+};
+
+PeerRenderer.prototype.createJaw_ = function() {
+  var geometry = new THREE.BoxGeometry(HEAD_WIDTH, JAW_HEIGHT, HEAD_WIDTH);
+  var material = new THREE.MeshStandardMaterial({color: 0xFF4181});
+  var jaw = new THREE.Mesh(geometry, material);
+  return jaw;
 };
 
 module.exports = PeerRenderer;
