@@ -18,7 +18,7 @@ require('webvr-boilerplate');
  *   TODO(smus): Shrink/grow yourself, and the other peer.
  */
 function ChatRenderer() {
-  this.scale = 0.5;
+  this.scale = 1;
 
   this.init_();
 }
@@ -60,6 +60,10 @@ ChatRenderer.prototype.init_ = function() {
   var light = new THREE.DirectionalLight(0xefefff, 1.5);
   light.position.set(1, 1, 1).normalize();
   scene.add(light);
+
+  var light = new THREE.DirectionalLight(0xffefef, 1.5);
+  light.position.set(-1, -1, -1).normalize();
+  scene.add(light);
   
   var raycaster = new THREE.Raycaster();
   var mouse = new THREE.Vector2();
@@ -94,10 +98,8 @@ ChatRenderer.prototype.init_ = function() {
 
 
   // Set up event listeners.
-  this.boundMouseMove = this.onMouseMove_.bind(this);
   this.boundKeyUp = this.onKeyUp_.bind(this);
   this.boundTouchEnd = this.onTouchEnd_.bind(this);
-  window.addEventListener('mousemove', this.boundMouseMove, false);
   window.addEventListener('keyup', this.boundKeyUp, false);
   window.addEventListener('touchend', this.boundTouchEnd, false);
 
@@ -118,7 +120,6 @@ ChatRenderer.prototype.destroy = function() {
   container.removeChild(this.renderer.domElement);
 
   // Remove all bound event handlers.
-  window.removeEventListener('mousemove', this.boundMouseMove, false);
   window.removeEventListener('keyup', this.boundKeyUp, false);
   window.removeEventListener('touchend', this.boundTouchEnd, false);
 };
@@ -150,14 +151,6 @@ ChatRenderer.prototype.getPose = function() {
   position.y = 0;
   return new Pose(this.camera.quaternion, position, this.scale);
 };
-
-ChatRenderer.prototype.onMouseMove_ = function(e) {
-  // Calculate mouse position in normalized device coordinates (-1 to +1) for
-  // both components.
-	this.mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-	this.mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;		
-};
-
 
 ChatRenderer.prototype.onKeyUp_ = function(e) {
   // Temporarily treat space bar as a Cardboard button click.
