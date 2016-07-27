@@ -12,8 +12,12 @@ function SfxPlayer(audioContext) {
 }
 
 SfxPlayer.prototype.createSource = function(bufferName) {
+  var buffer = this.buffers[bufferName];
+  if (!buffer) {
+    return;
+  }
   var source = this.context.createBufferSource();
-  source.buffer = this.buffers[bufferName];
+  source.buffer = buffer;
   return source;
 };
 
@@ -32,6 +36,7 @@ SfxPlayer.prototype.loadBuffer_ = function(name) {
     return self.context.decodeAudioData(arrayBuffer);
   }).then(function(audioBuffer) {
     self.buffers[name] = audioBuffer;
+    console.log('Loaded buffer %s from url %s', name, url);
   });
 };
 
