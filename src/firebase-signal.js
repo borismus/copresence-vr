@@ -1,6 +1,14 @@
 var EventEmitter = require('eventemitter3');
 var Firebase = require('firebase');
 
+var config = {
+  apiKey: "AIzaSyBoFE5PciBtALg0TcUlCphjsqytNbwapEQ",
+  authDomain: "copresence-vr.firebaseapp.com",
+  databaseURL: "https://copresence-vr.firebaseio.com",
+  storageBucket: "",
+};
+firebase.initializeApp(config);
+
 /**
  * A Firebase implementation of a signalling server for establishing 1:1 WebRTC
  * connections.
@@ -12,16 +20,6 @@ var Firebase = require('firebase');
  *   Disconnect from a peer.
  */
 function FirebaseSignal(peerId) {
-  // Instantiate a Firebase connection.
-  var config = {
-    apiKey: "AIzaSyBoFE5PciBtALg0TcUlCphjsqytNbwapEQ",
-    authDomain: "copresence-vr.firebaseapp.com",
-    databaseURL: "https://copresence-vr.firebaseio.com",
-    storageBucket: "",
-  };
-  firebase.initializeApp(config);
-
-  // Handle registration and unregistration.
   this.peerId = peerId;
   this.registerSelf_();
 
@@ -58,7 +56,7 @@ FirebaseSignal.prototype.setUsername = function(name) {
   this.userRef.update({username: name});
 };
 
-FirebaseSignal.prototype.registerSelf_ = function(peerId) {
+FirebaseSignal.prototype.registerSelf_ = function() {
   // Register our peer ID and user name with the Firebase.
   this.onlineRef = firebase.database().ref('online');
 
