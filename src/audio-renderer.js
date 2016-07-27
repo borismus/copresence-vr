@@ -1,5 +1,6 @@
 var PitchShift = require('soundbank-pitch-shift');
 var SfxPlayer = require('./sfx-player');
+var VoiceActivityDetector = require('./voice-activity-detector');
 
 /**
  * Adds effects to audio streams. Mainly this is around spatialization of the
@@ -31,15 +32,34 @@ function AudioRenderer() {
 
   this.forward = new THREE.Vector3();
   
-  this.scale = 1.5;
-  this.peerScale = 1.5;
+  this.scale = 1;
+  this.peerScale = 1;
 
-  this.sfxPlayer = new SfxPlayer(this.context);
+  this.sfxPlayer = new SfxPlayer(context);
+  this.vad = new VoiceActivityDetector(context);
+
+  // Current audio level.
+  this.currentLevel = null;
 }
 
 AudioRenderer.prototype.setRemoteStream = function(stream) {
+  var self = this;
+
   var peerInput = this.context.createMediaStreamSource(stream);
   peerInput.connect(this.pitchShift);
+
+  this.vad.setSource(peerInput);
+  this.vad.on('active', function(e) {
+    self.currentLevel = e;
+  });
+
+  this.vad.on('inactive', function(e) {
+    self.currentLevel = null;
+  });
+
+  this.vad.on('power', function(e) {
+    self.currentLevel = e;
+  });
 };
 
 AudioRenderer.prototype.setPose = function(pose) {
@@ -58,10 +78,10 @@ AudioRenderer.prototype.setPose = function(pose) {
 
   // Play the appropriate sound effect.
   if (this.scale > oldScale) {
-    this.playLocalSound('grow');
+    this.playLocalSound_('grow');
   }
   if (this.scale < oldScale) {
-    this.playLocalSound('shrink');
+    this.playLocalSound_('shrink');
   }
 
   this.setPeerPitch_();
@@ -81,13 +101,29 @@ AudioRenderer.prototype.setPeerPose = function(peerPose) {
   
   // Play a remote sound effect.
   if (this.peerScale > oldScale) {
-    this.playRemoteSound('grow');
+    this.playRemoteSound_('grow');
   }
   if (this.peerScale < oldScale) {
-    this.playRemoteSound('shrink');
+    this.playRemoteSound_('shrink');
   }
 
   this.setPeerPitch_();
+};
+
+AudioRenderer.prototype.getLevel = function() {
+  return this.currentLevel;
+};
+
+AudioRenderer.prototype.playRemoteSound_ = function(bufferName) {
+  var source = this.sfxPlayer.createSource(bufferName);
+  source.connect(this.pitchShift);
+  source.start();
+};
+
+AudioRenderer.prototype.playLocalSound_ = function(bufferName) {
+  var source = this.sfxPlayer.createSource(bufferName);
+  source.connect(this.context.destination);
+  source.start();
 };
 
 AudioRenderer.prototype.setPeerPitch_ = function() {
@@ -96,18 +132,6 @@ AudioRenderer.prototype.setPeerPitch_ = function() {
   if (this.pitchShift.transpose != semitones) {
     this.pitchShift.transpose = semitones;
   }
-};
-
-AudioRenderer.prototype.playRemoteSound = function(bufferName) {
-  var source = this.sfxPlayer.createSource(bufferName);
-  source.connect(this.pitchShift);
-  source.start();
-};
-
-AudioRenderer.prototype.playLocalSound = function(bufferName) {
-  var source = this.sfxPlayer.createSource(bufferName);
-  source.connect(this.context.destination);
-  source.start();
 };
 
 
