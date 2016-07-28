@@ -139,7 +139,6 @@ PeerConnection.prototype.onData_ = function(data) {
 
 PeerConnection.prototype.onPeerError_ = function(e) {
   console.log('onPeerError_', e);
-  this.emit('close');
 };
 
 module.exports = PeerConnection;
