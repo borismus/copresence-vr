@@ -49,10 +49,11 @@ PeerConnection.prototype.connect = function(remotePeerId) {
 
   // Make the audio call happen.
   navigator.webkitGetUserMedia(GUM_CONSTRAINTS, function(stream) {
+    self.onLocalStream_(stream);
     var call = self.peer.call(remotePeerId, stream);
     call.on('stream', function(remoteStream) {
       // Show stream in some video/canvas element.
-      self.onStream_(remoteStream);
+      self.onRemoteStream_(remoteStream);
     });
   }, function(e) {
     console.log('Failed to get local stream', e);
@@ -102,19 +103,25 @@ PeerConnection.prototype.getWebRTCConfig_ = function() {
 PeerConnection.prototype.onIncomingCall_ = function(call) {
   var self = this;
   navigator.webkitGetUserMedia(GUM_CONSTRAINTS, function(stream) {
+    self.onLocalStream_(stream);
     call.answer(stream); // Answer the call with an A/V stream.
     call.on('stream', function(remoteStream) {
       // Show stream in some video/canvas element.
-      self.onStream_(remoteStream);
+      self.onRemoteStream_(remoteStream);
     });
   }, function(err) {
     console.log('Failed to get local stream' ,err);
   });
 };
 
-PeerConnection.prototype.onStream_ = function(stream) {
-  console.log('onStream', stream);
+PeerConnection.prototype.onRemoteStream_ = function(stream) {
+  console.log('onRemoteStream_', stream);
   this.emit('remoteStream', stream);
+};
+
+PeerConnection.prototype.onLocalStream_ = function(stream) {
+  console.log('onLocalStream_', stream);
+  this.emit('localStream', stream);
 };
 
 PeerConnection.prototype.onReceiveConnection_ = function(conn) {

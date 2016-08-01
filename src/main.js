@@ -18,6 +18,7 @@ var lastSentTime = performance.now();
 //var pc;
 var rafID;
 var remoteStream;
+var localStream;
 
 var POSE_UPDATE_MS = 50;
 
@@ -60,8 +61,6 @@ function startPeerConnection() {
   pc.on('open', function() {
     fb.connect();
     chatRenderer = new ChatRenderer();
-    chatRenderer.on('scale', onScale);
-
     peerRenderer = new PeerRenderer(chatRenderer.scene);
 
     // Render the peer entering.
@@ -80,6 +79,10 @@ function startPeerConnection() {
 
     // Kill the remote stream.
     var track = remoteStream.getTracks()[0];
+    track.stop();
+
+    // Kill the local stream.
+    var track = localStream.getTracks()[0];
     track.stop();
   });
 
@@ -102,10 +105,16 @@ function startPeerConnection() {
     audioRenderer.setRemoteStream(stream);
     remoteStream = stream;
   });
+
+  pc.on('localStream', function(stream) {
+    localStream = stream;
+  });
 }
 
 function onResize() {
-  chatRenderer.onResize();
+  if (chatRenderer !== null) {
+    chatRenderer.onResize();
+  }
 }
 
 function onUsersChange(users) {
@@ -121,10 +130,10 @@ function onUsersChange(users) {
     var li = createUser(user);
     userList.appendChild(li);
   }
-}
 
-function onScale(newScale, oldScale) {
-  // Playback a sound effect.
+  if (userList.children.length === 0) {
+    userList.innerHTML = 'No users yet.';
+  }
 }
 
 function onUsernameChange(e) {

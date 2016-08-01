@@ -17,6 +17,9 @@ var WALK_DURATION = 1000;
 var WALK_ANGLE = Math.PI/6;
 var WALKING_RATE = 600;
 
+var Colors = {
+};
+
 var State = {
   NONE: 1,
   IDLE: 2,
