@@ -17,9 +17,6 @@ var WALK_DURATION = 1000;
 var WALK_ANGLE = Math.PI/6;
 var WALKING_RATE = 600;
 
-var Colors = {
-};
-
 var State = {
   NONE: 1,
   IDLE: 2,
@@ -41,8 +38,10 @@ var State = {
  *
  *   TODO(smus): Smoothly transition the other peer as they move around the world.
  */
-function PeerRenderer(scene) {
+function PeerRenderer(scene, peerId) {
   this.state = State.NONE;
+
+  this.color = this.getColorFromId_(peerId);
 
   // Create the peer itself.
   var peer = new THREE.Object3D();
@@ -107,6 +106,7 @@ PeerRenderer.prototype.enter = function() {
   tween.to(targetScale, 1000).easing(TWEEN.Easing.Elastic.InOut).start();
   this.peer.visible = true;
 
+  this.isAnimating = true;
   this.animate_();
 
   // Start the idle animation.
@@ -114,9 +114,21 @@ PeerRenderer.prototype.enter = function() {
 };
 
 PeerRenderer.prototype.leave = function() {
+  var self = this;
+
   // Fade the peer out.
+  var targetScale = new THREE.Vector3(0, 0, 0);
+  var tween = new TWEEN.Tween(this.peer.scale);
+  tween.to(targetScale, 1000).easing(TWEEN.Easing.Elastic.InOut)
+  tween.onComplete(function() {
+    self.peer.visible = false;
+  }).start();
+
   // Stop the idle animation.
   this.stopIdleAnimation_();
+
+  // Stop animating.
+  this.stopAnimating_();
 };
 
 PeerRenderer.prototype.setPeerPose = function(peerPose) {
@@ -207,7 +219,13 @@ PeerRenderer.prototype.animate_ = function() {
     }
   }
 
-  requestAnimationFrame(this.animate_.bind(this));
+  if (this.isAnimating) {
+    requestAnimationFrame(this.animate_.bind(this));
+  }
+};
+
+PeerRenderer.prototype.stopAnimating_ = function() {
+  this.isAnimating = false;
 };
 
 PeerRenderer.prototype.blink_ = function() {
@@ -318,16 +336,28 @@ PeerRenderer.prototype.createLeg_ = function() {
 
 PeerRenderer.prototype.createHead_ = function() {
   var geometry = new THREE.BoxGeometry(HEAD_WIDTH, HEAD_HEIGHT, HEAD_WIDTH);
-  var material = new THREE.MeshStandardMaterial({color: 0xFF4181});
+  var material = new THREE.MeshStandardMaterial({color: this.color});
   var head = new THREE.Mesh(geometry, material);
   return head;
 };
 
 PeerRenderer.prototype.createJaw_ = function() {
   var geometry = new THREE.BoxGeometry(HEAD_WIDTH, JAW_HEIGHT, HEAD_WIDTH);
-  var material = new THREE.MeshStandardMaterial({color: 0xFF4181});
+  var material = new THREE.MeshStandardMaterial({color: this.color});
   var jaw = new THREE.Mesh(geometry, material);
   return jaw;
+};
+
+// From http://goo.gl/IWRfBX
+PeerRenderer.prototype.getColorFromId_ = function(id) {
+  function componentToHex(component) {
+    return ('0' + component.toString(16)).substr(-2);
+  }
+  var hash = Util.getHashCode(id);
+  var r = (hash & 0xFF0000) >> 16;
+  var g = (hash & 0x00FF00) >> 8;
+  var b = hash & 0x0000FF;
+  return '#' + componentToHex(r) + componentToHex(g) + componentToHex(b);
 };
 
 module.exports = PeerRenderer;

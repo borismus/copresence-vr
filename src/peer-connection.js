@@ -16,6 +16,7 @@ var GUM_CONSTRAINTS = {video: false, audio: true};
  *   Send arbitrary data to the connected peer.
  *
  * Events:
+ *   localStream: a local stream is available.
  *   remoteStream: a remote stream is available.
  *   data: some data was received.
  *   open: this connection was opened.
@@ -61,7 +62,7 @@ PeerConnection.prototype.connect = function(remotePeerId) {
 
   // Also establish the data connection.
   var connection = peer.connect(remotePeerId);
-  this.onOpenConnection_(connection);
+  this.onOpenConnection_(connection, {isCaller: true});
 };
 
 PeerConnection.prototype.getPeerId = function() {
@@ -125,12 +126,14 @@ PeerConnection.prototype.onLocalStream_ = function(stream) {
 };
 
 PeerConnection.prototype.onReceiveConnection_ = function(conn) {
-  this.onOpenConnection_(conn);
+  this.onOpenConnection_(conn, {isCaller: false});
 };
 
-PeerConnection.prototype.onOpenConnection_ = function(conn) {
+PeerConnection.prototype.onOpenConnection_ = function(conn, opt_params) {
+  var params = opt_params || {};
+  var isCaller = !!params.isCaller;
   this.connection = conn;
-  this.emit('open');
+  this.emit('open', isCaller);
 
   conn.on('data', this.onData_.bind(this));
 

@@ -5,8 +5,7 @@ var EventEmitter = require('eventemitter3');
 var Pose = require('./pose');
 require('webvr-polyfill');
 var Util = require('./util');
-// TODO(smus): Make this more require-y.
-require('webvr-boilerplate');
+var WebVRManager = require('webvr-boilerplate');
 
 /**
  * Renders the chat world, which includes the person you are chatting with, and

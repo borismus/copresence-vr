@@ -12,7 +12,13 @@ var VoiceActivityDetector = require('./voice-activity-detector');
  *   Change pitch of the peer.
  */
 function AudioRenderer() {
-  var context = new AudioContext();
+  // Use the audio context if a global one exists.
+  var context;
+  if (window.audioContext) {
+    context = window.audioContext;
+  } else {
+    context = new AudioContext();
+  }
   var panner = context.createPanner();
   panner.panningModel = 'HRTF';
   // Increase the refDistance.

@@ -19,6 +19,7 @@
     "soundbank-pitch-shift": "^1.0.3",
     "three": "^0.77.1",
     "tween.js": "^16.3.4",
+    "webrtc-adapter": "^1.4.0",
     "webvr-boilerplate": "^0.4.3"
   }
 }

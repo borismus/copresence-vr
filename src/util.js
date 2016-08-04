@@ -29,7 +29,7 @@ Util.loadObj = function(root) {
   });
 
   function onProgress(e) {
-    console.log('onProgress', e);
+    //console.log('onProgress', e);
   }
 };
 
@@ -72,6 +72,32 @@ Util.serializePose = function(pose) {
 
 Util.randInt = function(min, max) {
   return parseInt(min + Math.random() * (max - min));
+};
+
+// Taken from http://stackoverflow.com/a/105074/515584
+// Strictly speaking, it's not a real UUID, but it gets the job done here
+Util.uuid = function() {
+  function s4() {
+    return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+  }
+
+  return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
+};
+
+Util.length = function(object) {
+  var count = 0;
+  for (var _ in object) {
+    count++;
+  }
+  return count;
+};
+
+Util.getHashCode = function(string) {
+  var hash = 5381;
+  for (var i = 0; i < string.length; i++) {
+    hash = ((hash << 5) + hash) + string.charCodeAt(i); /* hash * 33 + c */
+  }
+  return hash;
 };
 
 module.exports = Util;
