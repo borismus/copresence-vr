@@ -186,16 +186,18 @@ function onPeerConnectionCreated(pc) {
     // Create a chat renderer if there isn't one currently.
     if (!window.chatRenderer) {
       window.chatRenderer = new ChatRenderer();
+
+      // Assign yourself a random position on the field.
+      var bbox = window.chatRenderer.getDimensions();
+      var position = Util.randomPositionInBox(bbox);
+      window.chatRenderer.setPosition(position);
+
+      // Start rendering the scene.
       render();
     }
 
     var pr = new PeerRenderer(window.chatRenderer.scene, remotePeerId);
     peerRenderers[remotePeerId] = pr;
-
-    // Assign the peer a random position on the field.
-    var bbox = window.chatRenderer.getDimensions();
-    var position = Util.randomPositionInBox(bbox);
-    window.chatRenderer.setPosition(position);
 
     // Render the peer entering.
     pr.enter();
