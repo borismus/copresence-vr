@@ -195,7 +195,6 @@ function onPeerConnectionCreated(pc) {
     // Assign the peer a random position on the field.
     var bbox = window.chatRenderer.getDimensions();
     var position = Util.randomPositionInBox(bbox);
-    position.y = 0;
     window.chatRenderer.setPosition(position);
 
     // Render the peer entering.
@@ -294,6 +293,12 @@ function render() {
   var peerConnections = peerManager.establishedPeerConnections;
   for (var i = 0; i < peerConnections.length; i++) {
     var pc = peerConnections[i];
+    
+    // If the connection isn't quite ready yet (possible if it was just
+    // established), ignore it.
+    if (!pc.isConnected()) {
+      continue;
+    }
 
     // If there is state to send, send it to active peer connections.
     if (state) {
