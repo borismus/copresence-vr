@@ -3,18 +3,21 @@
 // THREE.MTLLoader have been loaded.
 var EventEmitter = require('eventemitter3');
 var Pose = require('./pose');
-require('webvr-polyfill');
 var Util = require('./util');
 var WebVRManager = require('webvr-boilerplate');
+require('webvr-polyfill');
+
+var WIDTH = 10;
+var HEIGHT = 10;
+
 
 /**
- * Renders the chat world, which includes the person you are chatting with, and
- * some other objects that can be manipulated.
+ * Renders the chat world.
  *
  * Functionality
  *   Look around the world.
  *   Move around the world by looking on the ground and clicking.
- *   TODO(smus): Shrink/grow yourself, and the other peer.
+ *   Expose current 6DOF pose.
  */
 function ChatRenderer() {
   this.scale = 1;
@@ -69,7 +72,7 @@ ChatRenderer.prototype.init_ = function() {
 
   // Load grass, and tile it to make the scene.
   Util.loadObj('models/gras_flat_1').then(function(mesh) {
-    var field = Util.tileMesh2D(mesh.children[0]);
+    var field = Util.tileMesh2D(mesh.children[0], WIDTH, HEIGHT);
     field.name = 'field';
     scene.add(field);
   });
@@ -127,7 +130,6 @@ ChatRenderer.prototype.render = function(ts) {
   this.controls.update();
 
   this.manager.render(this.scene, this.camera, ts);
-  //this.effect.render(this.scene, this.camera);
 
   this.raycast_();
 };
@@ -149,6 +151,16 @@ ChatRenderer.prototype.getPose = function() {
   var position = this.dolly.position.clone();
   position.y = 0;
   return new Pose(this.camera.quaternion, position, this.scale);
+};
+
+ChatRenderer.prototype.getDimensions = function() {
+  return new THREE.Box3(new THREE.Vector3(-WIDTH/2, 0, -HEIGHT/2),
+                        new THREE.Vector3(WIDTH/2,  0,  HEIGHT/2));
+};
+
+ChatRenderer.prototype.setPosition = function(position) {
+  position.y = this.scale;
+  this.dolly.position.copy(position);
 };
 
 ChatRenderer.prototype.onKeyUp_ = function(e) {

@@ -2,6 +2,7 @@ var AudioRenderer = require('./audio-renderer');
 var ChatRenderer = require('./chat-renderer');
 var FirebaseSignal = require('./firebase-signal');
 var PeerConnection = require('./peer-connection-rtc');
+var PeerManager = require('./peer-manager');
 var PeerRenderer = require('./peer-renderer');
 var Pose = require('./pose');
 var TWEEN = require('tween.js');
@@ -10,10 +11,10 @@ var Util = require('./util');
 // Globals.
 window.chatRenderer = null;
 // Firebase signalling channel.
-var fb;
+signal = null;
+// Peer manager.
+peerManager = null;
 
-// Array of all peer connections.
-peerConnections = [];
 // Objects keyed on remotePeerId, of AudioRenderer and PeerRenderer objects.
 audioRenderers = {};
 peerRenderers = {};
@@ -22,7 +23,10 @@ var rafID;
 var lastSentPose;
 var lastSentTime = performance.now();
 
+// How quickly to update dynamically changing pose.
 var POSE_UPDATE_MS = 25;
+// How quickly to send pose even if it remains unchanged.
+var POSE_HEARTBEAT_MS = 1000;
 
 function onLoad() {
   // Ensure that we are either in a localhost or secure environment.
@@ -32,9 +36,6 @@ function onLoad() {
 
   // Create the signal server.
   initSignalling();
-
-  // Establish a new peer connection with the signal server.
-  createPeerConnection();
 
   callButton = document.querySelector('button#call');
   callButton.disabled = true;
@@ -52,15 +53,18 @@ function onLoad() {
 }
 
 function initSignalling() {
-  fb = new FirebaseSignal();
+  signal = new FirebaseSignal();
+  peerManager = new PeerManager(signal);
+  peerManager.on('connection', onPeerConnectionCreated);
+  peerManager.createActiveConnection();
 
   if (localStorage.username) {
-    fb.setUsername(localStorage.username);
+    signal.setUsername(localStorage.username);
   }
 
   // Show all available users.
-  fb.on('userschange', onUsersChange);
-  fb.on('peerleave', onPeerLeave);
+  signal.on('userschange', onUsersChange);
+  signal.on('peerleave', onPeerLeave);
 }
 
 function onResize() {
@@ -77,7 +81,7 @@ function onUsersChange(users) {
   for (var id in users) {
     var user = users[id];
     // Ignore yourself.
-    if (id == fb.getOwnPeerId()) {
+    if (id == signal.getOwnPeerId()) {
       continue;
     }
     // If the user is in a room,
@@ -120,20 +124,13 @@ function onPeerLeave(e) {
   delete audioRenderers[peerId];
 
   // Close the local stream for the correct peer.
-  for (var i = 0; i < peerConnections.length; i++) {
-    var pc = peerConnections[i];
-    if (pc.remotePeerId == e.peerId) {
-      pc.close();
-      // And destroy the peer connection.
-      peerConnections.splice(i, 1);
-    }
-  }
+  peerManager.disconnect(peerId);
 
   // If we are the last peer, disband the room.
-  fb.getPeersInRoom(e.roomId).then(function(peers) {
+  signal.getPeersInRoom(e.roomId).then(function(peers) {
     if (Util.length(peers) <= 1) {
       // Notify the signalling server.
-      fb.leaveRoom();
+      signal.leaveRoom();
 
       // Destroy the main renderer and stop animating.
       chatRenderer.destroy();
@@ -150,7 +147,7 @@ function onUsernameChange(e) {
   localStorage.username = username;
 
   // Update the Firebase signal server.
-  fb.setUsername(username);
+  signal.setUsername(username);
 }
 
 function createUser(label, opt_info) {
@@ -184,9 +181,7 @@ function onClickListItem(li, opt_info) {
   }
 }
 
-function createPeerConnection() {
-  var pc = new PeerConnection(fb);
-
+function onPeerConnectionCreated(pc) {
   pc.on('open', function(remotePeerId) {
     // Create a chat renderer if there isn't one currently.
     if (!window.chatRenderer) {
@@ -194,13 +189,14 @@ function createPeerConnection() {
       render();
     }
 
-    // If we aren't the caller, spawn a new connection.
-    if (!pc.isCaller) {
-      createPeerConnection();
-    }
-
-    var pr = new PeerRenderer(window.chatRenderer.scene, pc.remotePeerId);
+    var pr = new PeerRenderer(window.chatRenderer.scene, remotePeerId);
     peerRenderers[remotePeerId] = pr;
+
+    // Assign the peer a random position on the field.
+    var bbox = window.chatRenderer.getDimensions();
+    var position = Util.randomPositionInBox(bbox);
+    position.y = 0;
+    window.chatRenderer.setPosition(position);
 
     // Render the peer entering.
     pr.enter();
@@ -225,47 +221,34 @@ function createPeerConnection() {
     ar.setRemoteStream(stream);
     audioRenderers[pc.remotePeerId] = ar;
   });
-
-  peerConnections.push(pc);
-
-  return pc;
 }
 
 function onCall() {
   if (selectedInfo.userId) {
-    // Use the last peer connection. Assume one always exists.
-    var pc = peerConnections[peerConnections.length - 1];
-
-    // Connect to a single user.
-    pc.connect(selectedInfo.userId).then(function() {
+    // Connect to a single user using a new peer connection.
+    connectUsingNewPeerConnection(selectedInfo.userId)().then(function() {
       // The caller tells the signaling server to join the room.
-      fb.createRoom(selectedInfo.userId);
-
-      // Create another peer connection in case someone connects to us.
-      createPeerConnection();
+      signal.createRoom(selectedInfo.userId);
     });
   } else if (selectedInfo.roomId) {
 
     // Get the list of peers connected to the room.
-    fb.getPeersInRoom(selectedInfo.roomId).then(function(peers) {
-
+    signal.getPeersInRoom(selectedInfo.roomId).then(function(peers) {
       // Create multiple peer connections in the series.
       var peerIds = [];
       for (var peerId in peers) {
         peerIds.push(peerId);
       }
+      console.log('Establishing connections to %d peers.', peerIds.length);
 
-      // TODO: Generalize to N peers.
       var promise = connectUsingNewPeerConnection(peerIds[0])();
       for (var i = 1; i < peerIds.length; i++) {
-        promise = promise.then(connectUsingNewPeerConnection(peerIds[1]));
+        promise = promise.then(connectUsingNewPeerConnection(peerIds[i]));
       }
 
       promise.then(function() {
-        fb.joinRoom(selectedInfo.roomId);
-
-        // Create another peer connection in case someone connects to us.
-        createPeerConnection();
+        console.log('Connected to %d peers.', peerIds.length);
+        signal.joinRoom(selectedInfo.roomId);
       });
     });
   }
@@ -275,13 +258,17 @@ function connectUsingNewPeerConnection(peerId) {
   return function() {
     return new Promise(function(resolve, reject) {
       console.log('Connecting to peer %s.', peerId);
-      var pc = createPeerConnection();
-      pc.on('ready', function() {
-        pc.connect(peerId).then(resolve, reject);
+      peerManager.connect(peerId).then(function(e) {
+        console.log('Connection to peer %s established.', peerId);
+        resolve();
+      }, function(e) {
+        console.error('Connection to peer %s failed: %s', peerId, e);
+        reject();
       });
     });
   };
 };
+
 
 function render() {
   window.chatRenderer.render();
@@ -291,7 +278,11 @@ function render() {
   var lastMessageDelta = now - lastSentTime;
   var pose = window.chatRenderer.getPose();
   var state = null;
-  if (!pose.equals(lastSentPose) && lastMessageDelta > POSE_UPDATE_MS) {
+
+  // Send the pose if it's changed (throttled), or send a rarer heartbeat (for
+  // new clients).
+  if (lastMessageDelta > POSE_HEARTBEAT_MS || 
+      (!pose.equals(lastSentPose) && lastMessageDelta > POSE_UPDATE_MS)) {
     var state = {
       type: 'pose',
       data: pose.toJsonObject()
@@ -300,16 +291,13 @@ function render() {
     lastSentTime = now;
   }
 
+  var peerConnections = peerManager.establishedPeerConnections;
   for (var i = 0; i < peerConnections.length; i++) {
     var pc = peerConnections[i];
-    // Sometimes peerConnections aren't connected.
-    if (!pc.isConnected()) {
-      continue;
-    }
 
     // If there is state to send, send it to active peer connections.
     if (state) {
-      console.log('Sent state', state);
+      //console.log('Sent state to peer %s.', pc.remotePeerId);
       pc.send(JSON.stringify(state));
     }
 

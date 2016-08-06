@@ -2,8 +2,6 @@ var EventEmitter = require('eventemitter3');
 var Util = require('./util');
 var adapter = require('webrtc-adapter');
 
-var GUM_CONSTRAINTS = {video: false, audio: true};
-
 /**
  * Uses our Firebase for a signaling server, no longer using peer.js at all
  * because it's unmaintained and flakey.
@@ -22,10 +20,11 @@ var GUM_CONSTRAINTS = {video: false, audio: true};
  *   data: some data was received.
  *   open: this connection was opened.
  */
-function PeerConnection(signal) {
+function PeerConnection(manager) {
   var self = this;
-  this.signal = signal;
-  this.uuid = signal.getOwnPeerId();
+  this.manager = manager;
+  this.connectionId = Math.random();
+
   this.isCaller = false;
 
   this.getWebRTCConfig_().then(function(config) {
@@ -33,6 +32,7 @@ function PeerConnection(signal) {
     peerConnection.onicecandidate = self.onIceCandidate_.bind(self);
     peerConnection.onaddstream = self.onAddStream_.bind(self);
     peerConnection.ondatachannel = self.onDataChannel_.bind(self);
+    peerConnection.oniceconnectionstatechange = self.onIceConnectionStateChange_.bind(self);
     
     var sendChannel = peerConnection.createDataChannel('sendDataChannel');
     sendChannel.onopen = self.onSendDataOpen_.bind(self);
@@ -41,9 +41,7 @@ function PeerConnection(signal) {
     self.sendChannel = sendChannel;
     self.peerConnection = peerConnection;
 
-    // Listen for messages from the Firebase signal server.
-    self.boundOnMessage = self.onMessage_.bind(self);
-    signal.on('message', self.boundOnMessage);
+    // Emit ready event.
     self.emit('ready');
   });
 }
@@ -55,63 +53,106 @@ PeerConnection.prototype = new EventEmitter();
  * @return {Promise} A promise that fires when the connection is established.
  */
 PeerConnection.prototype.connect = function(remotePeerId) {
-  this.isCaller = true;
+  var self = this;
 
   return new Promise(function(resolve, reject) {
-    this.remotePeerId = remotePeerId;
+    self.isCaller = true;
+    self.remotePeerId = remotePeerId;
 
-    this.getLocalStream_().then(function(localStream) {
-      this.onLocalStream_(localStream);
-      this.peerConnection.addStream(localStream);
+    self.manager.getLocalStream().then(function(localStream) {
+      self.peerConnection.addStream(localStream);
 
-      this.peerConnection.createOffer()
-        .then(this.onCreateOffer_.bind(this))
-        .catch(this.onError_);
+      self.peerConnection.createOffer()
+        .then(self.onCreateOffer_.bind(self))
+        .catch(self.onError_);
 
-    }.bind(this)).catch(this.onError_);
+    }).catch(self.onError_);
 
-    this.onConnectResolve = resolve;
-    this.onConnectReject = reject;
-  }.bind(this));
+    self.onConnectResolve = resolve;
+    self.onConnectReject = reject;
+  });
 };
 
 PeerConnection.prototype.send = function(data) {
   if (this.sendChannel.readyState != 'open') {
-    console.error('Not sending message: send channel not ready.');
+    //console.error('Not sending message: send channel not ready.');
     return;
   }
   this.sendChannel.send(data);
 };
 
 PeerConnection.prototype.close = function() {
+  console.log('PeerConnection.close');
 };
 
 PeerConnection.prototype.isConnected = function() {
   return !!this.remotePeerId;
 };
 
+PeerConnection.prototype.processSignalingMessage = function(msg) {
+  var self = this;
+
+  console.log('processSignalingMessage type: %s', msg.type);
+  var pc = this.peerConnection;
+  switch (msg.type) {
+    case 'offer':
+      pc.setRemoteDescription(new RTCSessionDescription(msg)).then(function() {
+        self.manager.getLocalStream().then(function(localStream) {
+          pc.addStream(localStream);
+          pc.createAnswer().then(self.onCreateAnswer_.bind(self)).catch(self.onError_);
+        });
+      });
+      break;
+    case 'answer':
+      pc.setRemoteDescription(new RTCSessionDescription(msg)).then(function(e) {
+        console.log('setRemoteDescription success!');
+      }).catch(function(e) {
+        console.error('setRemoteDescription failed!', e);
+      });
+      break;
+    default:
+      console.log('Got unknown message of type %s', msg.type);
+  }
+}
+
+PeerConnection.prototype.processIceCandidate = function(msg) {
+  console.log('processIceCandidate');
+  if (!this.peerConnection) {
+    console.log('No peer connection. Should not happen.');
+    return;
+  }
+
+  var candidate = new RTCIceCandidate(msg);
+  this.peerConnection.addIceCandidate(candidate).catch(this.onError_);
+};
+
 /** PRIVATE API **/
 
 PeerConnection.prototype.onIceCandidate_ = function(event) {
   if (event.candidate != null) {
-    this.signal.send(this.remotePeerId, {ice: event.candidate.toJSON(), uuid: this.uuid});
+    this.manager.sendSignalMessage({
+      ice: event.candidate.toJSON()
+    });
   }
 };
 
 PeerConnection.prototype.onAddStream_ = function(e) {
   console.log('onAddStream_');
 
-  // Stop listening for messages on this channel.
-  this.signal.removeListener('message', this.boundOnMessage);
-
   this.onRemoteStream_(e.stream);
-  this.emit('open', this.remotePeerId);
 
   if (this.onConnectResolve) {
     console.log('onConnectResolve');
     this.onConnectResolve();
     this.onConnectResolve = null;
     this.onConnectReject = null;
+  }
+};
+
+PeerConnection.prototype.onIceConnectionStateChange_ = function(e) {
+  console.log('onIceConnectionStateChange_', e);
+  if (this.peerConnection.iceConnectionState == 'connected') {
+    this.emit('open', this.remotePeerId);
   }
 };
 
@@ -146,46 +187,10 @@ PeerConnection.prototype.onSendDataClose_ = function(e) {
   console.log('onSendDataClose_');
 };
 
-PeerConnection.prototype.getLocalStream_ = function() {
-  return new Promise(function(resolve, reject) {
-    // This local stream should be unique per page.
-    if (window.localStream) {
-      resolve(window.localStream);
-    } else {
-      navigator.webkitGetUserMedia(GUM_CONSTRAINTS, function(stream) {
-        window.localStream = stream;
-        resolve(stream);
-      }, reject);
-    }
-  });
-};
-
-PeerConnection.prototype.onLocalStream_ = function(stream) {
-  console.log('onLocalStream_', stream);
-  this.localStream = stream;
-  this.emit('localStream', stream);
-};
-
 PeerConnection.prototype.onRemoteStream_ = function(stream) {
   console.log('onRemoteStream_', stream);
   this.remoteStream = stream;
   this.emit('remoteStream', stream);
-};
-
-PeerConnection.prototype.onMessage_ = function(message) {
-  var self = this;
-
-  // If we're being called, save the remote uuid for later.
-  if (!this.isCaller && !this.remotePeerId) {
-    this.remotePeerId = message.uuid;
-  }
-
-  if (message.sdp) {
-    this.processSignalingMessage(message.sdp);
-  } else if (message.ice) {
-    var candidate = new RTCIceCandidate(message.ice);
-    this.peerConnection.addIceCandidate(candidate).catch(this.onError_);
-  }
 };
 
 PeerConnection.prototype.onCreateOffer_ = function(description) {
@@ -193,7 +198,9 @@ PeerConnection.prototype.onCreateOffer_ = function(description) {
   var self = this;
 
   this.peerConnection.setLocalDescription(description).then(function() {
-    self.signal.send(self.remotePeerId, {sdp: self.peerConnection.localDescription.toJSON(), uuid: self.uuid});
+    self.manager.sendSignalMessage({
+      sdp: self.peerConnection.localDescription.toJSON()
+    });
   }).catch(self.onError_);
 };
 
@@ -202,28 +209,11 @@ PeerConnection.prototype.onCreateAnswer_ = function(description) {
   this.onCreateOffer_(description);
 };
 
-PeerConnection.prototype.processSignalingMessage = function(msg) {
-  var self = this;
 
-  console.log('Got signal message of type %s', msg.type);
-  var pc = this.peerConnection;
-  switch (msg.type) {
-    case 'offer':
-      pc.setRemoteDescription(new RTCSessionDescription(msg));
-      this.getLocalStream_().then(function(localStream) {
-        self.onLocalStream_(localStream);
-        pc.addStream(localStream);
-        pc.createAnswer().then(this.onCreateAnswer_.bind(this))
-            .catch(this.onError_);
-      }.bind(this));
-      break;
-    case 'answer':
-      pc.setRemoteDescription(new RTCSessionDescription(msg));
-      break;
-    default:
-      console.log('Got unknown message of type %s', msg.type);
-  }
-}
+PeerConnection.prototype.setRemotePeerId = function(remotePeerId) {
+  console.log('setRemotePeerId: %s, randomId: %s', remotePeerId, this.connectionId);
+  this.remotePeerId = remotePeerId;
+};
 
 PeerConnection.prototype.onError_ = function(e) {
   console.error(e);

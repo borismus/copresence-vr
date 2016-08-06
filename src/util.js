@@ -33,9 +33,9 @@ Util.loadObj = function(root) {
   }
 };
 
-Util.tileMesh2D = function(tileMesh) {
-  var w = 20;
-  var h = 20;
+Util.tileMesh2D = function(tileMesh, width, height) {
+  var w = width;
+  var h = height;
   var rows = 2;
   var cols = 2;
   tileMesh.material.color.set(new THREE.Color(0, 0.5, 0));
@@ -98,6 +98,15 @@ Util.getHashCode = function(string) {
     hash = ((hash << 5) + hash) + string.charCodeAt(i); /* hash * 33 + c */
   }
   return hash;
+};
+
+Util.randomPositionInBox = function(bbox) {
+  function randomAxis(axis) {
+    var min = bbox.min[axis];
+    var max = bbox.max[axis];
+    return min + Math.random() * (max - min);
+  }
+  return new THREE.Vector3(randomAxis('x'), randomAxis('y'), randomAxis('z'));
 };
 
 module.exports = Util;
