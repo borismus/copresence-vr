@@ -39,7 +39,7 @@ function AudioRenderer() {
   // Play remote sound effects through the same pitch shifted channel, but do it
   // much quieter!
   this.remoteSfxGain = context.createGain();
-  this.remoteSfxGain.gain.value = 0.4;
+  this.remoteSfxGain.gain.value = 0.1;
   this.remoteSfxGain.connect(pitchShift);
 
   this.forward = new THREE.Vector3();
