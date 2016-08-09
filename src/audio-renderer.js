@@ -39,8 +39,12 @@ function AudioRenderer() {
   // Play remote sound effects through the same pitch shifted channel, but do it
   // much quieter!
   this.remoteSfxGain = context.createGain();
-  this.remoteSfxGain.gain.value = 0.1;
+  this.remoteSfxGain.gain.value = 0.3;
   this.remoteSfxGain.connect(pitchShift);
+
+  this.localSfxGain = context.createGain();
+  this.localSfxGain.gain.value = 0.3;
+  this.localSfxGain.connect(context.destination);
 
   this.forward = new THREE.Vector3();
   
@@ -134,7 +138,7 @@ AudioRenderer.prototype.playRemoteSound_ = function(bufferName) {
 
 AudioRenderer.prototype.playLocalSound_ = function(bufferName) {
   var source = this.sfxPlayer.createSource(bufferName);
-  source.connect(this.context.destination);
+  source.connect(this.localSfxGain);
   source.start();
 };
 
