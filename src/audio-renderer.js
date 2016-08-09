@@ -36,6 +36,12 @@ function AudioRenderer() {
   // No transpose by default.
   this.pitchShift.transpose = 0;
 
+  // Play remote sound effects through the same pitch shifted channel, but do it
+  // much quieter!
+  this.remoteSfxGain = context.createGain();
+  this.remoteSfxGain.gain.value = 0.4;
+  this.remoteSfxGain.connect(pitchShift);
+
   this.forward = new THREE.Vector3();
   
   this.scale = 1;
@@ -122,7 +128,7 @@ AudioRenderer.prototype.getLevel = function() {
 
 AudioRenderer.prototype.playRemoteSound_ = function(bufferName) {
   var source = this.sfxPlayer.createSource(bufferName);
-  source.connect(this.pitchShift);
+  source.connect(this.remoteSfxGain);
   source.start();
 };
 

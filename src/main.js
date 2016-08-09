@@ -132,6 +132,9 @@ function onPeerLeave(e) {
       // Notify the signalling server.
       signal.leaveRoom();
 
+      // Close the local stream.
+      peerManager.closeLocalStream();
+
       // Destroy the main renderer and stop animating.
       chatRenderer.destroy();
       chatRenderer = null;

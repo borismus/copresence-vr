@@ -89,6 +89,17 @@ PeerManager.prototype.getLocalStream = function() {
   });
 };
 
+PeerManager.prototype.closeLocalStream = function() {
+  if (!window.localStream) {
+    console.error('Cannot close local stream: none found.');
+    return;
+  }
+  var tracks = window.localStream.getTracks();
+  for (var i = 0; i < tracks.length; i++) {
+    tracks[i].stop();
+  }
+};
+
 
 /***** PRIVATE METHODS FOLLOW *****/
 
