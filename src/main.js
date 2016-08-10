@@ -29,6 +29,13 @@ var POSE_UPDATE_MS = 25;
 var POSE_HEARTBEAT_MS = 1000;
 
 function onLoad() {
+  // Show an error on iOS.
+  if (Util.isIOS()) {
+    var dialog = document.querySelector('#no-ios');
+    dialog.showModal();
+    return;
+  }
+
   // Ensure that we are either in a localhost or secure environment.
   if (window.location.hostname !== 'localhost' && window.location.protocol !== 'https:') {
     window.location.protocol = 'https';

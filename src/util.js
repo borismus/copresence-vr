@@ -109,4 +109,9 @@ Util.randomPositionInBox = function(bbox) {
   return new THREE.Vector3(randomAxis('x'), randomAxis('y'), randomAxis('z'));
 };
 
+Util.isIOS = function() {
+  return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
+};
+
+
 module.exports = Util;

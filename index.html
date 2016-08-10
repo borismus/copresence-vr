@@ -43,6 +43,18 @@ canvas {
     Call
   </button>
 
+  <!-- A dialog to indicate that there's no support for iOS. -->
+  <dialog id="no-ios" class="mdl-dialog">
+  <h4 class="mdl-dialog__title">Microphone not available</h4>
+  <div class="mdl-dialog__content">
+    <p>
+    Unfortunately, VR copresence does not work in iOS Safari, since the
+    <a href="https://www.w3.org/TR/mediacapture-streams/">GetUserMedia API</a>
+    is not implemented.
+    </p>
+  </div>
+  </dialog>
+
   <!-- TODO(smus): annoying that THREE.js is not browserify friendly. -->
   <script src="node_modules/three/build/three.js"></script>
   <script src="node_modules/three/examples/js/effects/VREffect.js"></script>
